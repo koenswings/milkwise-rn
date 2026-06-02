@@ -45,58 +45,40 @@ export default function App() {
           tabBarStyle: {
             backgroundColor: COLORS.card,
             borderTopColor: '#334155',
-            paddingBottom: 4,
-            height: 58,
+            paddingBottom: 16,
+            paddingTop: 10,
+            height: 90,
           },
           tabBarActiveTintColor: COLORS.blue,
           tabBarInactiveTintColor: COLORS.textSecondary,
-          tabBarLabelStyle: { fontSize: 11, marginBottom: 2 },
+          tabBarLabelStyle: { fontSize: 13, fontWeight: '600', marginTop: 0 },
+          tabBarIconStyle: { marginBottom: 0 },
         }}
       >
         <Tab.Screen
           name="Dashboard"
           component={DashboardScreen}
-          options={{
-            title: 'Dashboard',
-            tabBarLabel: '🏠 Home',
-            tabBarIcon: () => null,
-          }}
+          options={{ title: 'Dashboard', tabBarLabel: 'Home', tabBarIcon: ({ color }) => <Text style={{ fontSize: 26 }}>🏠</Text> }}
         />
         <Tab.Screen
           name="Log"
           component={LogScreen}
-          options={{
-            title: 'Log Feed',
-            tabBarLabel: '➕ Log',
-            tabBarIcon: () => null,
-          }}
+          options={{ title: 'Log Feed', tabBarLabel: 'Log', tabBarIcon: ({ color }) => <Text style={{ fontSize: 26 }}>➕</Text> }}
         />
         <Tab.Screen
           name="History"
           component={HistoryScreen}
-          options={{
-            title: 'History',
-            tabBarLabel: '📋 History',
-            tabBarIcon: () => null,
-          }}
+          options={{ title: 'History', tabBarLabel: 'History', tabBarIcon: ({ color }) => <Text style={{ fontSize: 26 }}>📋</Text> }}
         />
         <Tab.Screen
           name="Analytics"
           component={AnalyticsScreen}
-          options={{
-            title: 'Analytics',
-            tabBarLabel: '📊 Analytics',
-            tabBarIcon: () => null,
-          }}
+          options={{ title: 'Analytics', tabBarLabel: 'Analytics', tabBarIcon: ({ color }) => <Text style={{ fontSize: 26 }}>📊</Text> }}
         />
         <Tab.Screen
           name="Settings"
           component={SettingsScreen}
-          options={{
-            title: 'Settings',
-            tabBarLabel: '⚙️ Settings',
-            tabBarIcon: () => null,
-          }}
+          options={{ title: 'Settings', tabBarLabel: 'Settings', tabBarIcon: ({ color }) => <Text style={{ fontSize: 26 }}>⚙️</Text> }}
         />
       </Tab.Navigator>
     </NavigationContainer>
