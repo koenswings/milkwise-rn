@@ -202,22 +202,43 @@ export default function AnalyticsScreen() {
 
       {/* Bar chart */}
       <View style={styles.chartCard}>
-        <Text style={styles.chartTitle}>Daily Totals (ml)</Text>
+        <View style={styles.chartHeader}>
+          <Text style={styles.chartTitle}>Daily Totals (ml)</Text>
+          <View style={styles.targetBadge}>
+            <Text style={styles.targetBadgeText}>
+              ― target {derived.dailyTargetMl.toFixed(0)} ml
+            </Text>
+          </View>
+        </View>
         {chartData.some(v => v > 0) ? (
           <BarChart
             data={{
               labels: chartLabels,
-              datasets: [{ data: chartData.length > 0 ? chartData : [0] }],
+              datasets: [
+                {
+                  data: chartData.length > 0 ? chartData : [0],
+                  // Color each bar: green ≥ target, yellow ≥ 80%, red < 80%
+                  colors: chartData.map(v => (opacity: number) => {
+                    const pct = (v / derived.dailyTargetMl) * 100;
+                    if (pct > 110) return `rgba(248, 113, 113, ${opacity})`; // red - overfed
+                    if (pct >= 80) return `rgba(74, 222, 128, ${opacity})`;  // green - on track
+                    if (pct >= 70) return `rgba(250, 204, 21, ${opacity})`;  // yellow - behind
+                    return `rgba(248, 113, 113, ${opacity})`;                // red - very behind
+                  }),
+                },
+              ],
             }}
             width={screenWidth - 64}
             height={200}
             yAxisLabel=""
             yAxisSuffix=""
+            withCustomBarColorFromData
+            flatColor
             chartConfig={{
               backgroundGradientFrom: COLORS.card,
               backgroundGradientTo: COLORS.card,
               decimalPlaces: 0,
-              color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
+              color: (opacity = 1) => `rgba(74, 222, 128, ${opacity})`,
               labelColor: () => COLORS.textSecondary,
               propsForBackgroundLines: { stroke: COLORS.border },
             }}
@@ -230,6 +251,9 @@ export default function AnalyticsScreen() {
             <Text style={styles.noDataText}>No feed data for this period</Text>
           </View>
         )}
+        <Text style={styles.chartLegend}>
+          🟢 on track  🟡 slightly behind  🔴 overfed or significantly behind
+        </Text>
       </View>
 
       {/* Stats grid */}
@@ -319,7 +343,29 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     alignItems: 'center',
   },
-  chartTitle: { color: COLORS.textPrimary, fontWeight: '600', marginBottom: 12, alignSelf: 'flex-start' },
+  chartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    marginBottom: 12,
+  },
+  chartTitle: { color: COLORS.textPrimary, fontWeight: '600' },
+  targetBadge: {
+    backgroundColor: 'rgba(74, 222, 128, 0.15)',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(74, 222, 128, 0.4)',
+  },
+  targetBadgeText: { color: COLORS.green, fontSize: 11, fontWeight: '600' },
+  chartLegend: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
   noData: { height: 200, alignItems: 'center', justifyContent: 'center' },
   noDataText: { color: COLORS.textSecondary },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },
