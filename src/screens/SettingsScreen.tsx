@@ -65,12 +65,14 @@ export default function SettingsScreen() {
     standardBottleVolume: 90,
     yellowThresholdPct: 5,
     redThresholdPct: 10,
+    timeFormat: '24h',
   });
   const [weightStr, setWeightStr] = useState('6.27');
   const [mlPerKgStr, setMlPerKgStr] = useState('150');
   const [bottleVolStr, setBottleVolStr] = useState('90');
   const [yellowThreshStr, setYellowThreshStr] = useState('5');
   const [redThreshStr, setRedThreshStr] = useState('10');
+  const [timeFormat, setTimeFormatState] = useState<'24h' | '12h'>('24h');
   const [csvText, setCsvText] = useState('');
 
   const load = useCallback(async () => {
@@ -81,6 +83,7 @@ export default function SettingsScreen() {
     setBottleVolStr(String(s.standardBottleVolume));
     setYellowThreshStr(String(s.yellowThresholdPct));
     setRedThreshStr(String(s.redThresholdPct));
+    setTimeFormatState(s.timeFormat ?? '24h');
   }, []);
 
   useFocusEffect(
@@ -101,7 +104,7 @@ export default function SettingsScreen() {
       return;
     }
 
-    const newSettings: Settings = { weightKg, mlPerKgPerDay, standardBottleVolume, yellowThresholdPct, redThresholdPct };
+    const newSettings: Settings = { weightKg, mlPerKgPerDay, standardBottleVolume, yellowThresholdPct, redThresholdPct, timeFormat };
     await saveSettings(newSettings);
     setSettings(newSettings);
     Alert.alert('Saved', 'Settings saved successfully.');
@@ -203,6 +206,21 @@ export default function SettingsScreen() {
           <Text style={styles.hint}>
             Within ±{yellowThreshStr}% of target = on track. Beyond ±{redThreshStr}% = seriously off.
           </Text>
+
+          <Text style={[styles.label, { marginTop: 16 }]}>Time format</Text>
+          <View style={styles.toggleRow}>
+            {(['24h', '12h'] as const).map((fmt) => (
+              <TouchableOpacity
+                key={fmt}
+                style={[styles.quickBtn, timeFormat === fmt && styles.quickBtnActive]}
+                onPress={() => setTimeFormatState(fmt)}
+              >
+                <Text style={[styles.quickBtnText, timeFormat === fmt && styles.quickBtnTextActive]}>
+                  {fmt}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
             <Text style={styles.saveButtonText}>💾 Save Settings</Text>
@@ -322,4 +340,20 @@ const styles = StyleSheet.create({
     borderColor: COLORS.red,
   },
   clearButtonText: { color: COLORS.red, fontSize: 15, fontWeight: '600' },
+  toggleRow: { flexDirection: 'row', gap: 10, marginTop: 6 },
+  quickBtn: {
+    flex: 1,
+    backgroundColor: COLORS.inputBg,
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  quickBtnActive: {
+    backgroundColor: COLORS.blue,
+    borderColor: COLORS.blue,
+  },
+  quickBtnText: { fontSize: 15, color: COLORS.textSecondary, fontWeight: '600' },
+  quickBtnTextActive: { color: '#fff' },
 });

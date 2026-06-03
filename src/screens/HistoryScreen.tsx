@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getFeeds, deleteFeed, updateFeed, getSettings } from '../lib/store';
+import { formatDateTime } from '../lib/formatTime';
 import { feedsWithCredit, deriveSettings } from '../lib/calculations';
 import { FeedWithCredit, Settings } from '../types';
 
@@ -26,12 +27,6 @@ const COLORS = {
   border: '#334155',
   inputBg: '#0f172a',
 };
-
-function formatDateTime(ts: number): string {
-  const d = new Date(ts);
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) +
-    ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-}
 
 function toDateStr(ts: number): string {
   return new Date(ts).toISOString().slice(0, 10);
@@ -50,6 +45,7 @@ export default function HistoryScreen() {
     standardBottleVolume: 90,
     yellowThresholdPct: 5,
     redThresholdPct: 10,
+    timeFormat: '24h',
   });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editVolume, setEditVolume] = useState('');
@@ -153,7 +149,7 @@ export default function HistoryScreen() {
         ) : (
           <View style={styles.feedMain}>
             <View style={styles.feedInfo}>
-              <Text style={styles.feedTime}>{formatDateTime(item.timestamp)}</Text>
+              <Text style={styles.feedTime}>{formatDateTime(item.timestamp, settings.timeFormat)}</Text>
               <Text style={styles.feedMeta}>
                 {item.ageHours.toFixed(1)}h old · {item.creditMl.toFixed(0)} ml credit
               </Text>

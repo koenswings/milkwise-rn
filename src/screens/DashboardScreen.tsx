@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getFeeds, getSettings } from '../lib/store';
+import { formatDateTime, formatTime } from '../lib/formatTime';
 import {
   deriveSettings,
   strict24hTotal,
@@ -53,16 +54,6 @@ function isTomorrow(ts: number): boolean {
   return d.getDate() === t.getDate() && d.getMonth() === t.getMonth() && d.getFullYear() === t.getFullYear();
 }
 
-function formatDateTime(ts: number): string {
-  const d = new Date(ts);
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  const time = `${hh}:${mm}`;
-  if (isToday(ts)) return time;
-  if (isTomorrow(ts)) return `tomorrow ${time}`;
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' ' + time;
-}
-
 function formatRelative(ts: number, now: number): string {
   const diff = ts - now;
   const absDiff = Math.abs(diff);
@@ -71,12 +62,6 @@ function formatRelative(ts: number, now: number): string {
   const remMins = mins % 60;
   const timeStr = hrs > 0 ? `${hrs}h ${remMins}m` : `${mins}m`;
   return diff > 0 ? `in ${timeStr}` : `${timeStr} ago`;
-}
-
-function fmtTime(ts: number): string {
-  const d = new Date(ts);
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' ' +
-    String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
 
 interface SmoothedExplainerProps {
@@ -201,7 +186,7 @@ function SmoothedExplainerModal({ visible, onClose, hourlyRate, standardBottleVo
                     </View>
                     {withSomeCredit.map((f) => (
                       <View key={f.id} style={[styles.feedTableRow, styles.feedTableRowBorder]}>
-                        <Text style={[styles.feedTableCell, { flex: 2, color: COLORS.textSecondary, fontSize: 11 }]}>{fmtTime(f.timestamp)}</Text>
+                        <Text style={[styles.feedTableCell, { flex: 2, color: COLORS.textSecondary, fontSize: 11 }]}>{formatDateTime(f.timestamp)}</Text>
                         <Text style={[styles.feedTableCell, { textAlign: 'right' }]}>{f.volume}</Text>
                         <Text style={[styles.feedTableCell, { textAlign: 'right', color: f.ageHours < 24 ? COLORS.green : COLORS.yellow }]}>
                           {f.ageHours.toFixed(1)}h
@@ -256,6 +241,7 @@ export default function DashboardScreen({ navigation }: any) {
     standardBottleVolume: 90,
     yellowThresholdPct: 5,
     redThresholdPct: 10,
+    timeFormat: '24h',
   });
   const [showSmoothedExplainer, setShowSmoothedExplainer] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -350,7 +336,7 @@ export default function DashboardScreen({ navigation }: any) {
           <Text style={styles.cardLabel}>⏭ Next Feed</Text>
           {nextTs ? (
             <>
-              <Text style={styles.cardValue}>{formatDateTime(nextTs)}</Text>
+              <Text style={styles.cardValue}>{formatDateTime(nextTs, settings.timeFormat)}</Text>
               <Text style={styles.cardSub}>{formatRelative(nextTs, now)}</Text>
               <Text style={styles.cardMuted}>ideal: {derived.idealIntervalHours.toFixed(1)}h</Text>
             </>
@@ -363,7 +349,7 @@ export default function DashboardScreen({ navigation }: any) {
           <Text style={styles.cardLabel}>🕐 Last Feed</Text>
           {lastFeed ? (
             <>
-              <Text style={styles.cardValue}>{formatDateTime(lastFeed.timestamp)}</Text>
+              <Text style={styles.cardValue}>{formatDateTime(lastFeed.timestamp, settings.timeFormat)}</Text>
               <Text style={styles.cardSub}>{lastFeed.volume} ml</Text>
               <Text style={styles.cardMuted}>{formatRelative(lastFeed.timestamp, now)}</Text>
             </>

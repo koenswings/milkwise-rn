@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getFeeds, addFeed, generateId, getSettings } from '../lib/store';
+import { formatDateTime } from '../lib/formatTime';
 import { Feed, Settings } from '../types';
 import { deriveSettings } from '../lib/calculations';
 
@@ -35,12 +36,6 @@ function todayStr(): string {
 function nowTimeStr(): string {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-function formatDateTime(ts: number): string {
-  const d = new Date(ts);
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) +
-    ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
 
 export default function LogScreen({ navigation }: any) {
@@ -154,7 +149,7 @@ export default function LogScreen({ navigation }: any) {
             <View style={styles.card}>
               {recentFeeds.map((f, i) => (
                 <View key={f.id} style={[styles.feedRow, i < recentFeeds.length - 1 && styles.feedRowBorder]}>
-                  <Text style={styles.feedTime}>{formatDateTime(f.timestamp)}</Text>
+                  <Text style={styles.feedTime}>{formatDateTime(f.timestamp, settings?.timeFormat)}</Text>
                   <Text style={styles.feedVolume}>{f.volume} ml</Text>
                 </View>
               ))}

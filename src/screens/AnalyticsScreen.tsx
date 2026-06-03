@@ -146,6 +146,7 @@ export default function AnalyticsScreen() {
     standardBottleVolume: 90,
     yellowThresholdPct: 5,
     redThresholdPct: 10,
+    timeFormat: '24h',
   });
   const [period, setPeriod] = useState<7 | 30>(7);
   const [showConsistencyExplainer, setShowConsistencyExplainer] = useState(false);
