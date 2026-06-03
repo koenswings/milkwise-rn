@@ -148,6 +148,7 @@ export default function AnalyticsScreen() {
   });
   const [period, setPeriod] = useState<7 | 30>(7);
   const [showConsistencyExplainer, setShowConsistencyExplainer] = useState(false);
+  const [tappedDay, setTappedDay] = useState<{ date: string; totalMl: number; targetMl: number } | null>(null);
 
   const load = useCallback(async () => {
     const [f, s] = await Promise.all([getFeeds(), getSettings()]);
@@ -259,9 +260,40 @@ export default function AnalyticsScreen() {
             <Text style={styles.noDataText}>No feed data for this period</Text>
           </View>
         )}
-        <View style={styles.legendRow}>
-          <Text style={styles.chartLegend}>■ <Text style={{color: COLORS.green}}>on track</Text>  ■ <Text style={{color: COLORS.yellow}}>slightly off</Text>  ■ <Text style={{color: COLORS.red}}>overfed / behind</Text>  ■ <Text style={{color: '#64748b'}}>today / no data</Text></Text>
+        {/* Tappable day labels — tap any to see details */}
+        <View style={styles.dayTapRow}>
+          {totals.map((t, i) => (
+            <TouchableOpacity
+              key={t.date}
+              style={styles.dayTapBtn}
+              onPress={() => setTappedDay(
+                tappedDay?.date === t.date ? null : { date: t.date, totalMl: t.totalMl, targetMl: t.targetMl }
+              )}
+            >
+              <Text style={[
+                styles.dayTapLabel,
+                tappedDay?.date === t.date && styles.dayTapLabelActive,
+              ]}>
+                {period === 7
+                  ? ['Su','Mo','Tu','We','Th','Fr','Sa'][new Date(t.date).getDay()]
+                  : (i % 5 === 0 ? t.date.slice(5) : '·')}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
+        {tappedDay && (
+          <View style={styles.tapInfo}>
+            <Text style={styles.tapInfoDate}>{tappedDay.date}</Text>
+            <Text style={styles.tapInfoDetail}>
+              {tappedDay.totalMl > 0
+                ? `${tappedDay.totalMl} ml · target ${Math.round(tappedDay.targetMl)} ml · ${Math.round((tappedDay.totalMl / tappedDay.targetMl) * 100)}%`
+                : 'No feeds logged'}
+            </Text>
+            <TouchableOpacity onPress={() => setTappedDay(null)} style={styles.tapInfoClose}>
+              <Text style={styles.tapInfoCloseText}>×</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* Stats grid */}
@@ -368,14 +400,53 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(74, 222, 128, 0.4)',
   },
   targetBadgeText: { color: COLORS.green, fontSize: 11, fontWeight: '600' },
-  legendRow: {
+  dayTapRow: {
+    flexDirection: 'row',
     alignSelf: 'stretch',
-    marginTop: 8,
+    marginTop: 4,
+    marginBottom: 2,
   },
-  chartLegend: {
-    color: COLORS.textMuted,
+  dayTapBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  dayTapLabel: {
     fontSize: 10,
-    lineHeight: 16,
+    color: COLORS.textMuted,
+  },
+  dayTapLabelActive: {
+    color: COLORS.blue,
+    fontWeight: '700',
+  },
+  tapInfo: {
+    alignSelf: 'stretch',
+    marginTop: 10,
+    backgroundColor: 'rgba(51,65,85,0.6)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tapInfoDate: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  tapInfoDetail: {
+    color: COLORS.textPrimary,
+    fontSize: 12,
+    flex: 1,
+  },
+  tapInfoClose: {
+    paddingLeft: 8,
+  },
+  tapInfoCloseText: {
+    color: COLORS.textSecondary,
+    fontSize: 16,
+    lineHeight: 18,
   },
   noData: { height: 200, alignItems: 'center', justifyContent: 'center' },
   noDataText: { color: COLORS.textSecondary },
