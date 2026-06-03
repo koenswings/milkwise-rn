@@ -48,6 +48,8 @@ export default function HistoryScreen() {
     weightKg: 6.27,
     mlPerKgPerDay: 150,
     standardBottleVolume: 90,
+    yellowThresholdPct: 5,
+    redThresholdPct: 10,
   });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editVolume, setEditVolume] = useState('');

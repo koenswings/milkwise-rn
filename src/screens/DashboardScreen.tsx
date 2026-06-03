@@ -15,6 +15,7 @@ import {
   smoothedEffective,
   nextFeedTime,
   bottleCredit,
+  statusHexColor,
 } from '../lib/calculations';
 import { Feed, Settings } from '../types';
 
@@ -32,22 +33,11 @@ const COLORS = {
   border: '#334155',
 };
 
-// Mirrors web statusColor: warns on overfeeding (>105% yellow, >110% red)
-// and underfeeding (<80% yellow, <70% red).
-function statusHexColor(pct: number): string {
-  if (pct > 110) return COLORS.red;    // significantly overfed
-  if (pct > 105) return COLORS.yellow; // slightly overfed
-  if (pct >= 80) return COLORS.green;  // good zone
-  if (pct >= 70) return COLORS.yellow; // slightly underfed
-  return COLORS.red;                   // significantly underfed
-}
-
-function statusLabel(pct: number): string {
-  if (pct > 110) return '⚠️ overfed';
-  if (pct > 105) return 'slightly overfed';
-  if (pct >= 80) return 'on track';
-  if (pct >= 70) return 'slightly behind';
-  return '⚠️ behind';
+function statusLabel(pct: number, y = 5, r = 10): string {
+  const diff = Math.abs(pct - 100);
+  if (diff <= y) return 'on track';
+  if (pct > 100) return diff <= r ? 'slightly overfed' : '⚠️ overfed';
+  return diff <= r ? 'slightly behind' : '⚠️ behind';
 }
 
 function isToday(ts: number): boolean {
@@ -97,9 +87,11 @@ interface SmoothedExplainerProps {
   dailyTargetMl: number;
   feeds: Feed[];
   now: number;
+  yellowThresholdPct: number;
+  redThresholdPct: number;
 }
 
-function SmoothedExplainerModal({ visible, onClose, hourlyRate, standardBottleVolume, dailyTargetMl, feeds, now }: SmoothedExplainerProps) {
+function SmoothedExplainerModal({ visible, onClose, hourlyRate, standardBottleVolume, dailyTargetMl, feeds, now, yellowThresholdPct, redThresholdPct }: SmoothedExplainerProps) {
   const targetBottles = (dailyTargetMl / standardBottleVolume).toFixed(1);
 
   const sorted = [...feeds].sort((a, b) => b.timestamp - a.timestamp);
@@ -172,11 +164,11 @@ function SmoothedExplainerModal({ visible, onClose, hourlyRate, standardBottleVo
               <Text style={styles.explainerHeading}>What the % means</Text>
               <Text style={styles.explainerText}>The goal is to stay close to 100% — not just above it. Both underfeeding and overfeeding carry risks:</Text>
               <View style={{ marginTop: 8 }}>
-                <Text style={[styles.explainerText, { color: COLORS.red }]}>⚠️ {'>'} 110% — significantly overfed 🔴</Text>
-                <Text style={[styles.explainerText, { color: COLORS.yellow }]}>🟡 {'>'} 105% — slightly overfed, just watch</Text>
-                <Text style={[styles.explainerText, { color: COLORS.green }]}>🟢 80–105% — good zone, on track</Text>
-                <Text style={[styles.explainerText, { color: COLORS.yellow }]}>🟡 70–79% — slightly behind, offer a feed soon</Text>
-                <Text style={[styles.explainerText, { color: COLORS.red }]}>⚠️ {'<'} 70% — significantly behind, feed now 🔴</Text>
+                <Text style={[styles.explainerText, { color: COLORS.red }]}>⚠️ {'>'} {100 + redThresholdPct}% — significantly overfed 🔴</Text>
+                <Text style={[styles.explainerText, { color: COLORS.yellow }]}>🟡 {'>'} {100 + yellowThresholdPct}% — slightly overfed, just watch</Text>
+                <Text style={[styles.explainerText, { color: COLORS.green }]}>🟢 {100 - yellowThresholdPct}–{100 + yellowThresholdPct}% — good zone, on track</Text>
+                <Text style={[styles.explainerText, { color: COLORS.yellow }]}>🟡 {100 - redThresholdPct}–{100 - yellowThresholdPct - 1}% — slightly behind, offer a feed soon</Text>
+                <Text style={[styles.explainerText, { color: COLORS.red }]}>⚠️ {'<'} {100 - redThresholdPct}% — significantly behind, feed now 🔴</Text>
               </View>
             </View>
 
@@ -262,6 +254,8 @@ export default function DashboardScreen({ navigation }: any) {
     weightKg: 6.27,
     mlPerKgPerDay: 150,
     standardBottleVolume: 90,
+    yellowThresholdPct: 5,
+    redThresholdPct: 10,
   });
   const [showSmoothedExplainer, setShowSmoothedExplainer] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -323,13 +317,13 @@ export default function DashboardScreen({ navigation }: any) {
         {/* Strict 24h */}
         <View style={[styles.card, styles.halfCard]}>
           <Text style={styles.cardLabel}>Strict 24h</Text>
-          <Text style={[styles.cardValue, { color: statusHexColor(strictPct) }]}>
+          <Text style={[styles.cardValue, { color: statusHexColor(strictPct, settings.yellowThresholdPct, settings.redThresholdPct) }]}>
             {strict24.toFixed(0)} ml
           </Text>
-          <Text style={[styles.cardPct, { color: statusHexColor(strictPct) }]}>
+          <Text style={[styles.cardPct, { color: statusHexColor(strictPct, settings.yellowThresholdPct, settings.redThresholdPct) }]}>
             {strictPct.toFixed(0)}%
           </Text>
-          <Text style={[styles.cardMuted, { color: statusHexColor(strictPct) }]}>{statusLabel(strictPct)}</Text>
+          <Text style={[styles.cardMuted, { color: statusHexColor(strictPct, settings.yellowThresholdPct, settings.redThresholdPct) }]}>{statusLabel(strictPct, settings.yellowThresholdPct, settings.redThresholdPct)}</Text>
         </View>
 
         {/* Smoothed */}
@@ -340,13 +334,13 @@ export default function DashboardScreen({ navigation }: any) {
               <Text style={styles.questionBtn}>?</Text>
             </TouchableOpacity>
           </View>
-          <Text style={[styles.cardValue, { color: statusHexColor(smoothedPct) }]}>
+          <Text style={[styles.cardValue, { color: statusHexColor(smoothedPct, settings.yellowThresholdPct, settings.redThresholdPct) }]}>
             {smoothed.bottles.toFixed(1)} bottles
           </Text>
-          <Text style={[styles.cardPct, { color: statusHexColor(smoothedPct) }]}>
+          <Text style={[styles.cardPct, { color: statusHexColor(smoothedPct, settings.yellowThresholdPct, settings.redThresholdPct) }]}>
             {smoothedPct.toFixed(0)}%
           </Text>
-          <Text style={[styles.cardMuted, { color: statusHexColor(smoothedPct) }]}>{statusLabel(smoothedPct)}</Text>
+          <Text style={[styles.cardMuted, { color: statusHexColor(smoothedPct, settings.yellowThresholdPct, settings.redThresholdPct) }]}>{statusLabel(smoothedPct, settings.yellowThresholdPct, settings.redThresholdPct)}</Text>
         </View>
       </View>
 
@@ -405,6 +399,8 @@ export default function DashboardScreen({ navigation }: any) {
         dailyTargetMl={derived.dailyTargetMl}
         feeds={feeds}
         now={now}
+        yellowThresholdPct={settings.yellowThresholdPct}
+        redThresholdPct={settings.redThresholdPct}
       />
     </ScrollView>
   );

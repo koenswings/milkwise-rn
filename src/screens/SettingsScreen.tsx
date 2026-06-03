@@ -63,10 +63,14 @@ export default function SettingsScreen() {
     weightKg: 6.27,
     mlPerKgPerDay: 150,
     standardBottleVolume: 90,
+    yellowThresholdPct: 5,
+    redThresholdPct: 10,
   });
   const [weightStr, setWeightStr] = useState('6.27');
   const [mlPerKgStr, setMlPerKgStr] = useState('150');
   const [bottleVolStr, setBottleVolStr] = useState('90');
+  const [yellowThreshStr, setYellowThreshStr] = useState('5');
+  const [redThreshStr, setRedThreshStr] = useState('10');
   const [csvText, setCsvText] = useState('');
 
   const load = useCallback(async () => {
@@ -75,6 +79,8 @@ export default function SettingsScreen() {
     setWeightStr(String(s.weightKg));
     setMlPerKgStr(String(s.mlPerKgPerDay));
     setBottleVolStr(String(s.standardBottleVolume));
+    setYellowThreshStr(String(s.yellowThresholdPct));
+    setRedThreshStr(String(s.redThresholdPct));
   }, []);
 
   useFocusEffect(
@@ -87,13 +93,15 @@ export default function SettingsScreen() {
     const weightKg = parseFloat(weightStr);
     const mlPerKgPerDay = parseFloat(mlPerKgStr);
     const standardBottleVolume = parseFloat(bottleVolStr);
+    const yellowThresholdPct = parseFloat(yellowThreshStr);
+    const redThresholdPct = parseFloat(redThreshStr);
 
-    if (isNaN(weightKg) || isNaN(mlPerKgPerDay) || isNaN(standardBottleVolume)) {
+    if (isNaN(weightKg) || isNaN(mlPerKgPerDay) || isNaN(standardBottleVolume) || isNaN(yellowThresholdPct) || isNaN(redThresholdPct)) {
       Alert.alert('Invalid values', 'Please enter valid numbers for all fields.');
       return;
     }
 
-    const newSettings: Settings = { weightKg, mlPerKgPerDay, standardBottleVolume };
+    const newSettings: Settings = { weightKg, mlPerKgPerDay, standardBottleVolume, yellowThresholdPct, redThresholdPct };
     await saveSettings(newSettings);
     setSettings(newSettings);
     Alert.alert('Saved', 'Settings saved successfully.');
@@ -174,6 +182,27 @@ export default function SettingsScreen() {
             keyboardType="numeric"
             placeholderTextColor={COLORS.textSecondary}
           />
+
+          <Text style={styles.label}>On-track zone (±%)</Text>
+          <TextInput
+            style={styles.input}
+            value={yellowThreshStr}
+            onChangeText={setYellowThreshStr}
+            keyboardType="numeric"
+            placeholderTextColor={COLORS.textSecondary}
+          />
+
+          <Text style={styles.label}>Seriously off threshold (±%)</Text>
+          <TextInput
+            style={styles.input}
+            value={redThreshStr}
+            onChangeText={setRedThreshStr}
+            keyboardType="numeric"
+            placeholderTextColor={COLORS.textSecondary}
+          />
+          <Text style={styles.hint}>
+            Within ±{yellowThreshStr}% of target = on track. Beyond ±{redThreshStr}% = seriously off.
+          </Text>
 
           <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
             <Text style={styles.saveButtonText}>💾 Save Settings</Text>

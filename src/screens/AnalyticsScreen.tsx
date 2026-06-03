@@ -144,6 +144,8 @@ export default function AnalyticsScreen() {
     weightKg: 6.27,
     mlPerKgPerDay: 150,
     standardBottleVolume: 90,
+    yellowThresholdPct: 5,
+    redThresholdPct: 10,
   });
   const [period, setPeriod] = useState<7 | 30>(7);
   const [showConsistencyExplainer, setShowConsistencyExplainer] = useState(false);
@@ -221,9 +223,9 @@ export default function AnalyticsScreen() {
             if (t.date === todayStr) return '#64748b';
             if (t.totalMl === 0) return '#334155';
             const pct = (t.totalMl / t.targetMl) * 100;
-            if (pct > 110) return COLORS.red;
-            if (pct >= 80) return COLORS.green;
-            if (pct >= 70) return COLORS.yellow;
+            const diff = Math.abs(pct - 100);
+            if (diff <= settings.yellowThresholdPct) return COLORS.green;
+            if (diff <= settings.redThresholdPct) return COLORS.yellow;
             return COLORS.red;
           }
 
@@ -299,10 +301,9 @@ export default function AnalyticsScreen() {
 
         {/* Colour legend */}
         <View style={styles.legendRow}>
-          <View style={styles.legendItem}><View style={[styles.legendDot, {backgroundColor: COLORS.green}]} /><Text style={styles.legendText}>on track</Text></View>
-          <View style={styles.legendItem}><View style={[styles.legendDot, {backgroundColor: COLORS.yellow}]} /><Text style={styles.legendText}>slightly off</Text></View>
-          <View style={styles.legendItem}><View style={[styles.legendDot, {backgroundColor: COLORS.red}]} /><Text style={styles.legendText}>overfed/behind</Text></View>
-
+          <View style={styles.legendItem}><View style={[styles.legendDot, {backgroundColor: COLORS.green}]} /><Text style={styles.legendText}>on track (±{settings.yellowThresholdPct}%)</Text></View>
+          <View style={styles.legendItem}><View style={[styles.legendDot, {backgroundColor: COLORS.yellow}]} /><Text style={styles.legendText}>slightly off (±{settings.redThresholdPct}%)</Text></View>
+          <View style={styles.legendItem}><View style={[styles.legendDot, {backgroundColor: COLORS.red}]} /><Text style={styles.legendText}>significantly off</Text></View>
         </View>
       </View>
 
