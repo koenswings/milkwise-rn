@@ -5,7 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
+  Modal,
   Dimensions,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -25,6 +25,7 @@ const COLORS = {
   card: '#1e293b',
   textPrimary: '#e2e8f0',
   textSecondary: '#94a3b8',
+  textMuted: '#64748b',
   blue: '#3b82f6',
   green: '#4ade80',
   yellow: '#facc15',
@@ -34,11 +35,108 @@ const COLORS = {
 
 const screenWidth = Dimensions.get('window').width;
 
+// Aligned with web app thresholds: < 0.5h green, 0.5–1.5h yellow, > 1.5h red
 function consistencyColor(score: number | null): string {
   if (score === null) return COLORS.textSecondary;
-  if (score < 1) return COLORS.green;
-  if (score < 2) return COLORS.yellow;
+  if (score < 0.5) return COLORS.green;
+  if (score < 1.5) return COLORS.yellow;
   return COLORS.red;
+}
+
+interface ConsistencyExplainerProps {
+  visible: boolean;
+  onClose: () => void;
+  avgInterval: number | null;
+  consistency: number | null;
+  idealIntervalHours: number;
+}
+
+function ConsistencyExplainerModal({ visible, onClose, avgInterval, consistency, idealIntervalHours }: ConsistencyExplainerProps) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} style={styles.modalSheet}>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>What is Consistency (σ)?</Text>
+              <TouchableOpacity onPress={onClose}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.explainerSection}>
+              <Text style={styles.explainerHeading}>What it measures</Text>
+              <Text style={styles.explainerText}>
+                Consistency tells you how <Text style={styles.bold}>regular</Text> the gaps between feeds are.
+                A low number means feeds happen at roughly the same intervals — predictable and steady.
+                A high number means the gaps vary a lot — sometimes very short, sometimes very long.
+              </Text>
+            </View>
+
+            <View style={styles.explainerSection}>
+              <Text style={styles.explainerHeading}>How it's calculated</Text>
+              <Text style={styles.explainerText}>
+                We look at the time gap between each pair of feeds. Then we measure how much those gaps{' '}
+                <Text style={styles.italic}>vary</Text> from the average gap. The more they spread out, the higher the number.
+              </Text>
+              <View style={styles.exampleBox}>
+                <Text style={styles.exampleText}>
+                  <Text style={styles.bold}>Example:{'\n'}</Text>
+                  Gaps: 2.0h, 2.1h, 1.9h, 2.0h → very consistent → low σ (e.g. 0.07h){'\n'}
+                  Gaps: 1.0h, 3.5h, 1.2h, 4.0h → irregular → high σ (e.g. 1.3h)
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.explainerSection}>
+              <Text style={styles.explainerHeading}>What's a good score?</Text>
+              <Text style={[styles.explainerText, { marginBottom: 8 }]}>
+                There's no strict rule — every baby is different. As a rough guide:
+              </Text>
+              <View style={styles.scoreRow}>
+                <Text style={[styles.scoreRange, { color: COLORS.green }]}>&lt; 0.5h</Text>
+                <Text style={styles.scoreDesc}>Very regular feeding rhythm 🟢</Text>
+              </View>
+              <View style={styles.scoreRow}>
+                <Text style={[styles.scoreRange, { color: COLORS.yellow }]}>0.5–1.5h</Text>
+                <Text style={styles.scoreDesc}>Normal variation, nothing to worry about 🟡</Text>
+              </View>
+              <View style={styles.scoreRow}>
+                <Text style={[styles.scoreRange, { color: COLORS.red }]}>&gt; 1.5h</Text>
+                <Text style={styles.scoreDesc}>Wide variation — some feeds very close, some very far apart 🔴</Text>
+              </View>
+            </View>
+
+            {avgInterval !== null && consistency !== null && (
+              <View style={styles.explainerSection}>
+                <Text style={styles.explainerHeading}>Your numbers</Text>
+                <View style={styles.totalsBox}>
+                  <View style={styles.totalsRow}>
+                    <Text style={styles.totalsLabel}>Average gap between feeds</Text>
+                    <Text style={styles.totalsValue}>{avgInterval.toFixed(2)}h</Text>
+                  </View>
+                  <View style={styles.totalsRow}>
+                    <Text style={styles.totalsLabel}>Consistency score (σ)</Text>
+                    <Text style={[styles.totalsValue, { color: consistencyColor(consistency), fontWeight: '700' }]}>
+                      {consistency.toFixed(2)}h
+                    </Text>
+                  </View>
+                  <View style={styles.totalsRow}>
+                    <Text style={styles.totalsLabel}>Ideal interval</Text>
+                    <Text style={styles.totalsValue}>{idealIntervalHours.toFixed(2)}h</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            <TouchableOpacity style={styles.modalDismissBtn} onPress={onClose}>
+              <Text style={styles.modalDismissBtnText}>Got it</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
 }
 
 export default function AnalyticsScreen() {
@@ -49,6 +147,7 @@ export default function AnalyticsScreen() {
     standardBottleVolume: 90,
   });
   const [period, setPeriod] = useState<7 | 30>(7);
+  const [showConsistencyExplainer, setShowConsistencyExplainer] = useState(false);
 
   const load = useCallback(async () => {
     const [f, s] = await Promise.all([getFeeds(), getSettings()]);
@@ -70,7 +169,6 @@ export default function AnalyticsScreen() {
       const d = new Date(t.date);
       return ['Su','Mo','Tu','We','Th','Fr','Sa'][d.getDay()];
     }
-    // for 30 days, show every 5th date
     return i % 5 === 0 ? t.date.slice(5) : '';
   });
 
@@ -79,11 +177,6 @@ export default function AnalyticsScreen() {
   const avgInterval = avgIntervalHours(feeds);
   const consistency = consistencyScore(feeds);
   const targetBottlesPerDay = derived.dailyTargetMl / settings.standardBottleVolume;
-
-  const consistencyExplanation =
-    'Consistency score is the standard deviation of your feed intervals in hours. ' +
-    'A lower score means more regular timing. ' +
-    'Green < 1h, Yellow 1–2h, Red > 2h deviation.';
 
   const p3 = periodTotal(feeds, 3);
   const p7 = periodTotal(feeds, 7);
@@ -141,51 +234,64 @@ export default function AnalyticsScreen() {
 
       {/* Stats grid */}
       <View style={styles.statsGrid}>
+        {/* Avg Interval */}
         <View style={[styles.statCard, styles.halfCard]}>
           <Text style={styles.statLabel}>Avg Interval</Text>
           <Text style={styles.statValue}>
             {avgInterval !== null ? `${avgInterval.toFixed(1)}h` : '—'}
           </Text>
+          <Text style={styles.statSub}>
+            {derived ? `ideal: ${derived.idealIntervalHours.toFixed(1)}h` : ''}
+          </Text>
         </View>
+
+        {/* Consistency */}
         <View style={[styles.statCard, styles.halfCard]}>
           <View style={styles.rowSpaced}>
             <Text style={styles.statLabel}>Consistency</Text>
-            <TouchableOpacity onPress={() => Alert.alert('Consistency Score', consistencyExplanation)}>
+            <TouchableOpacity onPress={() => setShowConsistencyExplainer(true)}>
               <Text style={styles.questionBtn}>?</Text>
             </TouchableOpacity>
           </View>
           <Text style={[styles.statValue, { color: consistencyColor(consistency) }]}>
-            {consistency !== null ? `±${consistency.toFixed(1)}h` : '—'}
+            {consistency !== null ? `±${consistency.toFixed(2)}h` : '—'}
           </Text>
+          <Text style={styles.statSub}>lower = more consistent</Text>
         </View>
+
+        {/* Target bottles */}
         <View style={[styles.statCard, styles.halfCard]}>
           <Text style={styles.statLabel}>Target Bottles/day</Text>
           <Text style={styles.statValue}>{targetBottlesPerDay.toFixed(1)}</Text>
+          <Text style={styles.statSub}>{settings.standardBottleVolume} ml each</Text>
         </View>
+
+        {/* Total feeds */}
         <View style={[styles.statCard, styles.halfCard]}>
           <Text style={styles.statLabel}>Total Feeds</Text>
           <Text style={styles.statValue}>{feeds.length}</Text>
+          <Text style={styles.statSub}>all time</Text>
         </View>
       </View>
 
       {/* Period totals */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Period Totals</Text>
-        <View style={styles.periodRow}>
-          <View style={styles.periodItem}>
-            <Text style={styles.periodValue}>{(p3 / 1000).toFixed(2)} L</Text>
-            <Text style={styles.periodLabel}>3 days</Text>
+        {[{ label: 'Last 3 days', ml: p3 }, { label: 'Last 7 days', ml: p7 }, { label: 'Last 14 days', ml: p14 }].map(({ label, ml }) => (
+          <View key={label} style={styles.periodRow}>
+            <Text style={styles.periodLabel}>{label}</Text>
+            <Text style={styles.periodValue}>{Math.round(ml)} ml</Text>
           </View>
-          <View style={styles.periodItem}>
-            <Text style={styles.periodValue}>{(p7 / 1000).toFixed(2)} L</Text>
-            <Text style={styles.periodLabel}>7 days</Text>
-          </View>
-          <View style={styles.periodItem}>
-            <Text style={styles.periodValue}>{(p14 / 1000).toFixed(2)} L</Text>
-            <Text style={styles.periodLabel}>14 days</Text>
-          </View>
-        </View>
+        ))}
       </View>
+
+      <ConsistencyExplainerModal
+        visible={showConsistencyExplainer}
+        onClose={() => setShowConsistencyExplainer(false)}
+        avgInterval={avgInterval}
+        consistency={consistency}
+        idealIntervalHours={derived.idealIntervalHours}
+      />
     </ScrollView>
   );
 }
@@ -223,8 +329,9 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   halfCard: { flex: 1, minWidth: '45%' },
-  statLabel: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
+  statLabel: { fontSize: 11, color: COLORS.textSecondary, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
   statValue: { fontSize: 22, fontWeight: '700', color: COLORS.textPrimary },
+  statSub: { fontSize: 11, color: COLORS.textMuted, marginTop: 3 },
   rowSpaced: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   questionBtn: {
     color: COLORS.blue,
@@ -245,8 +352,60 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: { color: COLORS.textPrimary, fontWeight: '600', marginBottom: 12 },
-  periodRow: { flexDirection: 'row', justifyContent: 'space-around' },
-  periodItem: { alignItems: 'center' },
-  periodValue: { fontSize: 18, fontWeight: '700', color: COLORS.textPrimary },
-  periodLabel: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
+  periodRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  periodLabel: { color: COLORS.textSecondary, fontSize: 14 },
+  periodValue: { color: COLORS.textPrimary, fontSize: 14, fontWeight: '600' },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: COLORS.card,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    maxHeight: '85%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: { fontSize: 17, fontWeight: '700', color: COLORS.textPrimary, flex: 1, marginRight: 12 },
+  modalClose: { fontSize: 22, color: COLORS.textSecondary },
+  explainerSection: { marginBottom: 20 },
+  explainerHeading: { fontSize: 14, fontWeight: '600', color: COLORS.textPrimary, marginBottom: 6 },
+  explainerText: { fontSize: 13, color: '#cbd5e1', lineHeight: 20 },
+  bold: { fontWeight: '700', color: COLORS.textPrimary },
+  italic: { fontStyle: 'italic' },
+  exampleBox: {
+    backgroundColor: 'rgba(100,116,139,0.25)',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+  },
+  exampleText: { fontSize: 12, color: COLORS.textSecondary, lineHeight: 18 },
+  scoreRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6 },
+  scoreRange: { fontSize: 12, fontWeight: '700', width: 56, marginRight: 8 },
+  scoreDesc: { fontSize: 12, color: COLORS.textSecondary, flex: 1 },
+  totalsBox: {
+    backgroundColor: 'rgba(100,116,139,0.15)',
+    borderRadius: 8,
+    padding: 12,
+  },
+  totalsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  totalsLabel: { fontSize: 12, color: COLORS.textSecondary },
+  totalsValue: { fontSize: 12, color: COLORS.textPrimary, fontWeight: '600' },
+  modalDismissBtn: {
+    backgroundColor: COLORS.border,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  modalDismissBtnText: { color: COLORS.textPrimary, fontSize: 15, fontWeight: '600' },
 });
