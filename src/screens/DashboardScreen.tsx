@@ -271,13 +271,16 @@ export default function DashboardScreen({ navigation }: any) {
   const strict24 = strict24hTotal(feeds, now);
   const strictPct = (strict24 / derived.dailyTargetMl) * 100;
 
-  const smoothed = smoothedEffective(feeds, derived.hourlyRate, settings.standardBottleVolume, now);
-  const smoothedPct = (smoothed.totalMl / derived.dailyTargetMl) * 100;
-
-  const nextTs = nextFeedTime(feeds, derived.idealIntervalHours);
   const lastFeed = feeds.length > 0
     ? feeds.reduce((a, b) => (a.timestamp > b.timestamp ? a : b))
     : null;
+
+  // Smoothed frozen at last-feed time — only changes when a new feed is logged
+  const smoothedAt = lastFeed ? lastFeed.timestamp : now;
+  const smoothed = smoothedEffective(feeds, derived.hourlyRate, settings.standardBottleVolume, smoothedAt);
+  const smoothedPct = (smoothed.totalMl / derived.dailyTargetMl) * 100;
+
+  const nextTs = nextFeedTime(feeds, derived.idealIntervalHours);
 
   const feeds24h = feeds.filter(f => f.timestamp >= now - 86400000);
   const mlPerHour = (derived.hourlyRate).toFixed(1);
@@ -384,7 +387,7 @@ export default function DashboardScreen({ navigation }: any) {
         standardBottleVolume={settings.standardBottleVolume}
         dailyTargetMl={derived.dailyTargetMl}
         feeds={feeds}
-        now={now}
+        now={smoothedAt}
         yellowThresholdPct={settings.yellowThresholdPct}
         redThresholdPct={settings.redThresholdPct}
       />
