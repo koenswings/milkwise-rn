@@ -14,6 +14,8 @@ import {
   deriveSettings,
   strict24hTotal,
   smoothedEffective,
+  waterToMilk,
+  WATER_TO_MILK_RATIO,
   nextFeedTime,
   bottleCredit,
   statusHexColor,
@@ -77,19 +79,20 @@ interface SmoothedExplainerProps {
 }
 
 function SmoothedExplainerModal({ visible, onClose, hourlyRate, standardBottleVolume, dailyTargetMl, feeds, now, yellowThresholdPct, redThresholdPct }: SmoothedExplainerProps) {
-  const targetBottles = (dailyTargetMl / standardBottleVolume).toFixed(1);
+  const milkPerBottle = waterToMilk(standardBottleVolume);
+  const targetBottles = (dailyTargetMl / milkPerBottle).toFixed(1);
 
   const sorted = [...feeds].sort((a, b) => b.timestamp - a.timestamp);
   const withCredit = sorted.map((f) => {
     const ageHours = (now - f.timestamp) / (1000 * 60 * 60);
-    const credit = bottleCredit(ageHours, f.volume, hourlyRate);
+    const credit = bottleCredit(ageHours, waterToMilk(f.volume), hourlyRate);
     return { ...f, ageHours, credit };
   });
 
   const withSomeCredit = withCredit.filter((f) => f.credit > 0.1);
   const noCredit = withCredit.filter((f) => f.credit <= 0.1);
   const totalSmoothedMl = withCredit.reduce((sum, f) => sum + f.credit, 0);
-  const smoothedBottles = totalSmoothedMl / standardBottleVolume;
+  const smoothedBottles = totalSmoothedMl / milkPerBottle;
   const smoothedPct = (totalSmoothedMl / dailyTargetMl) * 100;
 
   const pctColor = smoothedPct >= 100 ? COLORS.green : smoothedPct >= 90 ? COLORS.yellow : COLORS.red;
@@ -191,7 +194,7 @@ function SmoothedExplainerModal({ visible, onClose, hourlyRate, standardBottleVo
                         <Text style={[styles.feedTableCell, { textAlign: 'right', color: f.ageHours < 24 ? COLORS.green : COLORS.yellow }]}>
                           {f.ageHours.toFixed(1)}h
                         </Text>
-                        <Text style={[styles.feedTableCell, { textAlign: 'right', color: f.credit >= f.volume - 0.1 ? COLORS.green : COLORS.yellow }]}>
+                        <Text style={[styles.feedTableCell, { textAlign: 'right', color: f.credit >= waterToMilk(f.volume) - 0.1 ? COLORS.green : COLORS.yellow }]}>
                           {f.credit.toFixed(0)} ml
                         </Text>
                       </View>
@@ -374,7 +377,7 @@ export default function DashboardScreen({ navigation }: any) {
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
           <Text style={styles.cardValue}>{Math.round(derived.dailyTargetMl)} ml</Text>
           <Text style={styles.cardMuted}>·</Text>
-          <Text style={[styles.cardValue, { fontSize: 16 }]}>{(derived.dailyTargetMl / settings.standardBottleVolume).toFixed(1)} × {settings.standardBottleVolume} ml bottles</Text>
+          <Text style={[styles.cardValue, { fontSize: 16 }]}>{(derived.dailyTargetMl / derived.milkPerBottle).toFixed(1)} × {settings.standardBottleVolume} ml bottles</Text>
         </View>
         <Text style={styles.cardMuted}>{settings.weightKg} kg × {settings.mlPerKgPerDay} ml/kg/day</Text>
       </View>
