@@ -15,7 +15,7 @@ import {
   strict24hTotal,
   smoothedEffective,
   waterToMilk,
-  WATER_TO_MILK_RATIO,
+  FORMULA_TABLE,
   nextFeedTime,
   bottleCredit,
   statusHexColor,
