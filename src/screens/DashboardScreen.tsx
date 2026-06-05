@@ -244,6 +244,7 @@ export default function DashboardScreen({ navigation }: any) {
     timeFormat: '24h',
   });
   const [showSmoothedExplainer, setShowSmoothedExplainer] = useState(false);
+  const [showStrictExplainer, setShowStrictExplainer] = useState(false);
   const [now, setNow] = useState(Date.now());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -305,7 +306,12 @@ export default function DashboardScreen({ navigation }: any) {
       <View style={styles.row}>
         {/* Strict 24h */}
         <View style={[styles.card, styles.halfCard]}>
-          <Text style={styles.cardLabel}>Strict 24h</Text>
+          <View style={styles.rowSpaced}>
+            <Text style={styles.cardLabel}>Strict 24h</Text>
+            <TouchableOpacity onPress={() => setShowStrictExplainer(true)}>
+              <Text style={styles.questionBtn}>?</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={[styles.cardValue, { color: statusHexColor(strictPct, settings.yellowThresholdPct, settings.redThresholdPct) }]}>
             {strict24.toFixed(0)} ml
           </Text>
@@ -315,10 +321,10 @@ export default function DashboardScreen({ navigation }: any) {
           <Text style={[styles.cardMuted, { color: statusHexColor(strictPct, settings.yellowThresholdPct, settings.redThresholdPct) }]}>{statusLabel(strictPct, settings.yellowThresholdPct, settings.redThresholdPct)}</Text>
         </View>
 
-        {/* Smoothed */}
+        {/* Smoothed 24h */}
         <View style={[styles.card, styles.halfCard]}>
           <View style={styles.rowSpaced}>
-            <Text style={styles.cardLabel}>Smoothed</Text>
+            <Text style={styles.cardLabel}>Smoothed 24h</Text>
             <TouchableOpacity onPress={() => setShowSmoothedExplainer(true)}>
               <Text style={styles.questionBtn}>?</Text>
             </TouchableOpacity>
@@ -390,6 +396,35 @@ export default function DashboardScreen({ navigation }: any) {
           </View>
         </View>
       </View>
+
+      <Modal visible={showStrictExplainer} animationType="slide" transparent onRequestClose={() => setShowStrictExplainer(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Strict 24h — how it works</Text>
+              <TouchableOpacity onPress={() => setShowStrictExplainer(false)}><Text style={styles.closeBtn}>×</Text></TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 460 }}>
+              <Text style={styles.explainerHeading}>What is this?</Text>
+              <Text style={styles.explainerText}>The Strict 24h value is the sum of all milk your baby actually drank in the last 24 hours, counted from the most recent feed.</Text>
+              <Text style={styles.explainerText}>This is the method paediatricians and health visitors commonly use to check whether a baby is getting enough nutrition over a day.</Text>
+
+              <Text style={[styles.explainerHeading, { marginTop: 16 }]}>Why it fluctuates so much</Text>
+              <Text style={styles.explainerText}>Because it uses a hard 24-hour cutoff, the number can drop sharply the moment a feed ‘falls off’ the window — even if the baby is perfectly well fed. A large bottle from 25 hours ago contributes zero, while the same bottle at 23 hours ago counts in full.</Text>
+              <Text style={styles.explainerText}>This makes it hard to use in practice for parents trying to actively manage feeds throughout the day.</Text>
+              <Text style={[styles.explainerText, { color: COLORS.textSecondary }]}>That’s why this app also shows the <Text style={{ color: COLORS.textPrimary, fontWeight: '600' }}>Smoothed 24h</Text> value, which gives each bottle a gradually decaying credit instead of a hard cutoff.</Text>
+
+              <Text style={[styles.explainerHeading, { marginTop: 16 }]}>The formula</Text>
+              <View style={styles.formulaBox}>
+                <Text style={styles.formulaText}>Strict 24h = Σ volume of all feeds in the last 24 hours</Text>
+              </View>
+            </ScrollView>
+            <TouchableOpacity style={styles.gotItBtn} onPress={() => setShowStrictExplainer(false)}>
+              <Text style={styles.gotItText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <SmoothedExplainerModal
         visible={showSmoothedExplainer}
@@ -515,4 +550,21 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   modalDismissBtnText: { color: COLORS.textPrimary, fontSize: 15, fontWeight: '600' },
+  closeBtn: { fontSize: 22, color: COLORS.textSecondary, paddingHorizontal: 4 },
+  formulaBox: {
+    backgroundColor: 'rgba(100,116,139,0.2)',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  formulaText: { fontSize: 13, color: COLORS.textPrimary, fontFamily: 'monospace' },
+  gotItBtn: {
+    backgroundColor: COLORS.border,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  gotItText: { color: COLORS.textPrimary, fontSize: 15, fontWeight: '600' },
 });
