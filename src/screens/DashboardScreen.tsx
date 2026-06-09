@@ -246,6 +246,7 @@ export default function DashboardScreen({ navigation }: any) {
     redThresholdPct: 10,
     timeFormat: '24h',
     maxCorrectionPct: 25,
+    useTargetAwarePredictor: true,
     
   });
   const [showSmoothedExplainer, setShowSmoothedExplainer] = useState(false);

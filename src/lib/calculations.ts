@@ -30,6 +30,29 @@ export const FORMULA_TABLE: { water: number; formula: number }[] = [
   { water: 210, formula: 240 },
 ];
 
+/** Convert prepared-formula ml back to water ml (inverse of waterToMilk). */
+export function milkToWater(milkMl: number): number {
+  const t = FORMULA_TABLE;
+  // Build inverse table
+  const inv = t.map(p => ({ milk: p.formula, water: p.water }));
+  if (milkMl <= inv[0].milk) {
+    const s = (inv[1].water - inv[0].water) / (inv[1].milk - inv[0].milk);
+    return inv[0].water + s * (milkMl - inv[0].milk);
+  }
+  const last = inv.length - 1;
+  if (milkMl >= inv[last].milk) {
+    const s = (inv[last].water - inv[last-1].water) / (inv[last].milk - inv[last-1].milk);
+    return inv[last].water + s * (milkMl - inv[last].milk);
+  }
+  for (let i = 0; i < last; i++) {
+    if (milkMl >= inv[i].milk && milkMl <= inv[i+1].milk) {
+      const f = (milkMl - inv[i].milk) / (inv[i+1].milk - inv[i].milk);
+      return inv[i].water + f * (inv[i+1].water - inv[i].water);
+    }
+  }
+  return milkMl * (90 / 100);
+}
+
 /** Convert a logged water-volume to prepared-formula volume using interpolation. */
 export function waterToMilk(waterMl: number): number {
   const t = FORMULA_TABLE;
@@ -122,52 +145,107 @@ export function feedsWithCredit(
 }
 
 /**
- * Formula S — Surplus/Deficit next feed predictor.
- * Mathematically equivalent to Formula E3 (incremental, no floor, initial pool = milkPerBottle).
+ * Compute smoothed total at a given reference time T, for Predictor 3.
+ * Uses the same bottle_credit formula as smoothedEffective.
+ */
+function smoothedAtTime(feeds: Feed[], hourlyRate: number, atMs: number): number {
+  return feeds.reduce((sum, f) => {
+    const ageHours = (atMs - f.timestamp) / 3_600_000;
+    return sum + bottleCredit(ageHours, waterToMilk(f.volume), hourlyRate);
+  }, 0);
+}
+
+/**
+ * Predictor 3 — Target-aware adjusted next bottle (T*)
  *
- * Proof of equivalence:
- *   balance_E3 = milkPerBottle + (totalMilk24h − hourlyRate × 24)
- *              = milkPerBottle + surplus
- *              = balance_S
+ * Find T* such that smoothed(T*) = dailyTargetMl − milkPerBottle.
+ * Giving a standard bottle at T* produces smoothed = dailyTargetMl exactly (if not capped).
  *
- * Energy model: the baby starts each 24h period with one bottle in reserve.
- * Feeds top up the reserve; the body burns at hourlyRate continuously.
- * Reserve can go positive (overfed carry-over) or negative (energy deficit
- * drawn from stored fat). rawNext = when the reserve returns to zero.
- * A positive balance → later feed; negative balance → earlier feed.
+ * Uses binary search over [lastFeed, lastFeed + maxCorrectionMs].
+ * Falls back to T_min when underfed (smoothed already below target − bottle).
+ */
+function findTargetAwareNext(
+  feeds: Feed[],
+  hourlyRate: number,
+  dailyTargetMl: number,
+  lastFeed: Feed,
+  standardNext: number,
+  maxCorrectionMs: number
+): { timestamp: number; capped: boolean } {
+  const milkPerBottle = waterToMilk(lastFeed.volume);
+  const targetBefore = dailyTargetMl - milkPerBottle;
+  const T_min = lastFeed.timestamp;
+  const T_max = standardNext + maxCorrectionMs;
+
+  const s_min = smoothedAtTime(feeds, hourlyRate, T_min);
+
+  // Underfed: smoothed already ≤ target-before-feed → give now
+  if (s_min <= targetBefore) {
+    return { timestamp: T_min, capped: false };
+  }
+
+  const s_max = smoothedAtTime(feeds, hourlyRate, T_max);
+
+  // Still overfed at max gap → cap applies
+  if (s_max > targetBefore) {
+    return { timestamp: T_max, capped: true };
+  }
+
+  // Binary search for T* where smoothed(T*) = targetBefore
+  let lo = T_min, hi = T_max;
+  for (let i = 0; i < 30; i++) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (smoothedAtTime(feeds, hourlyRate, mid) > targetBefore) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+    if (hi - lo < 60_000) break; // 1-minute precision
+  }
+  return { timestamp: Math.floor((lo + hi) / 2), capped: false };
+}
+
+/**
+ * Next bottle predictor (design doc: next-session-predictor-design.md)
  *
- * Correction is capped at ±maxCorrectionPct% of the ideal interval.
+ * Standard: standardNext = lastFeed.timestamp + waterToMilk(lastFeed.volume) / hourlyRate
+ *
+ * Predictor 2 (Formula S): adjustedNext = standard + clamp(surplus/hourlyRate, ±max)
+ * Predictor 3 (T*, default): binary search for T* where smoothed(T*) = target − bottle
+ *
+ * settings.useTargetAwarePredictor controls which is used.
  */
 export function nextFeedTime(
   feeds: Feed[],
   hourlyRate: number,
   smoothedTotal: number,
   dailyTargetMl: number,
-  settings: Pick<Settings, 'standardBottleVolume' | 'maxCorrectionPct'>
+  settings: Pick<Settings, 'maxCorrectionPct' | 'useTargetAwarePredictor'>
 ): NextFeedResult | null {
   if (feeds.length === 0) return null;
 
   const lastFeed = feeds.reduce((a, b) => (a.timestamp > b.timestamp ? a : b));
-  const milkPerBottle = waterToMilk(settings.standardBottleVolume);
-  const idealIntervalMs = (milkPerBottle / hourlyRate) * 3_600_000;
-  const maxCorrectionMs = idealIntervalMs * (settings.maxCorrectionPct / 100);
+  const lastMilkMl = waterToMilk(lastFeed.volume);
+  const standardIntervalMs = (lastMilkMl / hourlyRate) * 3_600_000;
+  const standardNext = lastFeed.timestamp + standardIntervalMs;
+  const maxCorrectionMs = standardIntervalMs * (settings.maxCorrectionPct / 100);
 
-  // Formula S: balance = milkPerBottle + surplus
-  const surplus = smoothedTotal - dailyTargetMl; // positive = overfed, negative = underfed
-  const balance = milkPerBottle + surplus;
-
-  // rawNext = lastFeed + balance / hourlyRate
-  const idealNext = lastFeed.timestamp + idealIntervalMs;
-  const rawNext = lastFeed.timestamp + (balance / hourlyRate) * 3_600_000;
-
-  // Clamp correction to ±maxCorrectionPct% of ideal interval
-  const clamped = Math.max(
-    idealNext - maxCorrectionMs,
-    Math.min(idealNext + maxCorrectionMs, rawNext)
-  );
-  const capped = Math.abs(clamped - rawNext) > 1;
-
-  return { timestamp: clamped, balanceMl: Math.round(balance), capped };
+  if (settings.useTargetAwarePredictor) {
+    // Predictor 3: T* binary search
+    const { timestamp, capped } = findTargetAwareNext(
+      feeds, hourlyRate, dailyTargetMl, lastFeed, standardNext, maxCorrectionMs
+    );
+    const surplus = smoothedTotal - dailyTargetMl;
+    return { timestamp, balanceMl: Math.round(surplus), capped };
+  } else {
+    // Predictor 2: Formula S
+    const surplus = smoothedTotal - dailyTargetMl;
+    const rawCorrectionMs = (surplus / hourlyRate) * 3_600_000;
+    const clampedCorrection = Math.max(-maxCorrectionMs, Math.min(maxCorrectionMs, rawCorrectionMs));
+    const timestamp = standardNext + clampedCorrection;
+    const capped = Math.abs(clampedCorrection - rawCorrectionMs) > 1;
+    return { timestamp, balanceMl: Math.round(surplus), capped };
+  }
 }
 
 export function avgIntervalHours(feeds: Feed[]): number | null {
